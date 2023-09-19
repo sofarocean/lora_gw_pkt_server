@@ -3,6 +3,9 @@
 *.bak
 *.csv
 test_loragw_*
-util_pkt_server
 *.a
 libloragw/inc/config.h
+# Ignore the util_pkt_server binary 
+util_pkt_server
+# But make sure we track changes on all folders!
+!*/
