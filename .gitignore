@@ -2,3 +2,7 @@
 *.swp
 *.bak
 *.csv
+test_loragw_*
+util_pkt_server
+*.a
+libloragw/inc/config.h
