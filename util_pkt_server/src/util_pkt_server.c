@@ -34,6 +34,10 @@ Maintainer: Sylvain Miermont
 #include <unistd.h>     /* getopt access */
 #include <stdlib.h>     /* atoi */
 
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
 #include "parson.h"
 #include "loragw_hal.h"
 
@@ -473,48 +477,84 @@ int main(int argc, char **argv)
     time(&now_time);
     open_log();
 
+    /* Set things up to serve data over the network */
+    int serversock, clientsock;
+    struct sockaddr_in loraserver, loraclient;
+
+    if ((serversock = socket(PF_INET, SOCK_STREAM, IPPPROTO_TCP)) < 0) {
+        MSG("ERROR: failed to create network socket, exiting\n");
+        return EXIT_FAILURE;
+    }
+    memset(&loraserver, 0, sizeof(loraserver));
+    loraserver.sin_family = AF_INET;
+    loraserver.sin_addr.s_addr = htonl(INADDR_ANY);
+    loraserver.sin_port = htons(2600);
+
+    if (bind(serversock, (struct sockaddr *) &loraserver, sizeof(loraserver)) < 0) {
+        MSG("ERROR: failed to bind network socket, exiting\n");
+        return EXIT_FAILURE;
+    }
+    
+    // Only allow one connection at a time (second arg = 0)
+    if (listen(serversock, 0) < 0) {
+        MSG("ERROR: failed to listen on network socket, exiting\n");
+        return EXIT_FAILURE;
+    }
+
     /* main loop */
-    while ((quit_sig != 1) && (exit_sig != 1)) {
-        /* fetch packets */
-        nb_pkt = lgw_receive(ARRAY_SIZE(rxpkt), rxpkt);
-        if (nb_pkt == LGW_HAL_ERROR) {
-            MSG("ERROR: failed packet fetch, exiting\n");
+
+    while(1) {
+        unsigned int clientlen = sizeof(loraclient);
+        /* Wait for client connection */
+        if ((clientsock = accept(serversock, (struct sockaddr *) &loraclient, &clientlen)) < 0) {
+            MSG("ERROR: failed to accept client connection, exiting\n");
             return EXIT_FAILURE;
-        } else if (nb_pkt == 0) {
-            clock_nanosleep(CLOCK_MONOTONIC, 0, &sleep_time, NULL); /* wait a short time if no packets */
-        } else {
-            /* local timestamp generation until we get accurate GPS time */
-            clock_gettime(CLOCK_REALTIME, &fetch_time);
-            x = gmtime(&(fetch_time.tv_sec));
-            sprintf(fetch_timestamp,"%04i-%02i-%02i %02i:%02i:%02i.%03liZ",(x->tm_year)+1900,(x->tm_mon)+1,x->tm_mday,x->tm_hour,x->tm_min,x->tm_sec,(fetch_time.tv_nsec)/1000000); /* ISO 8601 format */
         }
+        /* A client is now connected */
+        MSG("INFO: Client connected: %s\n", inet_ntoa(loraclient.sin_addr));
 
-        /* process packets */
-        for (i=0; i < nb_pkt; ++i) {
-            p = &rxpkt[i];
-
-            if (p->status == STAT_CRC_OK) && (p->modulation == MOD_LORA) &&
-               (p->bandwidth == BW_125KHZ) && (p->datarate == DR_LORA_SF7) &&
-               (p->coderate == CR_LORA_4_5) {
-                // Packet meets all our criteria. Time to forward it to the network.
-                
+        /* While a client is connected keep forwarding packets from the RAK module to the client. */
+        while ((quit_sig != 1) && (exit_sig != 1)) {
+            /* fetch packets */
+            nb_pkt = lgw_receive(ARRAY_SIZE(rxpkt), rxpkt);
+            if (nb_pkt == LGW_HAL_ERROR) {
+                MSG("ERROR: failed packet fetch, exiting\n");
+                return EXIT_FAILURE;
+            } else if (nb_pkt == 0) {
+                clock_nanosleep(CLOCK_MONOTONIC, 0, &sleep_time, NULL); /* wait a short time if no packets */
+            } else {
+                /* local timestamp generation until we get accurate GPS time */
+                clock_gettime(CLOCK_REALTIME, &fetch_time);
+                x = gmtime(&(fetch_time.tv_sec));
+                sprintf(fetch_timestamp,"%04i-%02i-%02i %02i:%02i:%02i.%03liZ",(x->tm_year)+1900,(x->tm_mon)+1,x->tm_mday,x->tm_hour,x->tm_min,x->tm_sec,(fetch_time.tv_nsec)/1000000); /* ISO 8601 format */
             }
 
-            /* writing packet RSSI */
-            //fprintf(log_file, "%+.0f,", p->rssi);
+            /* process packets */
+            for (i=0; i < nb_pkt; ++i) {
+                p = &rxpkt[i];
 
-            /* writing packet average SNR */
-            //fprintf(log_file, "%+5.1f,", p->snr);
+                if (p->status == STAT_CRC_OK) && (p->modulation == MOD_LORA) &&
+                   (p->bandwidth == BW_125KHZ) && (p->datarate == DR_LORA_SF7) &&
+                   (p->coderate == CR_LORA_4_5) {
+                    // Packet meets all our criteria. Time to forward it to the network.
+                    
+                }
 
-            /* writing hex-encoded payload (bundled in 32-bit words) */
-            fputs("\"", log_file);
-            for (j = 0; j < p->size; ++j) {
-                if ((j > 0) && (j%4 == 0)) fputs("-", log_file);
-                fprintf(log_file, "%02X", p->payload[j]);
+                /* writing packet RSSI */
+                //fprintf(log_file, "%+.0f,", p->rssi);
+
+                /* writing packet average SNR */
+                //fprintf(log_file, "%+5.1f,", p->snr);
+
+                /* writing hex-encoded payload (bundled in 32-bit words) */
+                fputs("\"", log_file);
+                for (j = 0; j < p->size; ++j) {
+                    if ((j > 0) && (j%4 == 0)) fputs("-", log_file);
+                    fprintf(log_file, "%02X", p->payload[j]);
+                }
             }
         }
     }
-
     if (exit_sig == 1) {
         /* clean up before leaving */
         i = lgw_stop();
