@@ -65,6 +65,8 @@ time_t log_start_time;
 FILE * log_file = NULL;
 char log_file_name[64];
 
+int32_t radio_freqs[2];
+int32_t chan_if_hz[2][4];
 /* -------------------------------------------------------------------------- */
 /* --- PRIVATE FUNCTIONS DECLARATION ---------------------------------------- */
 
@@ -186,6 +188,7 @@ int parse_SX1301_configuration(const char * conf_file) {
             } else {
                 rfconf.tx_enable = false;
             }
+            radio_freqs[i] = rfconf.freq_hz; // Save the radio center frequencies to global for later use converting packet freq back to spotter number.
             MSG("INFO: radio %i enabled (type %s), center frequency %u, RSSI offset %f, tx enabled %d, tx_notch_freq %u\n", i, str, rfconf.freq_hz, rfconf.rssi_offset, rfconf.tx_enable, rfconf.tx_notch_freq);
         }
         /* all parameters parsed, submitting configuration to the HAL */
@@ -194,7 +197,9 @@ int parse_SX1301_configuration(const char * conf_file) {
             return -1;
         }
     }
-
+    
+    uint8_t r0ch = 0;
+    uint8_t r1ch = 0;
     /* set configuration for LoRa multi-SF channels (bandwidth cannot be set) */
     for (i = 0; i < LGW_MULTI_NB; ++i) {
         memset(&ifconf, 0, sizeof(ifconf)); /* initialize configuration structure */
@@ -220,6 +225,12 @@ int parse_SX1301_configuration(const char * conf_file) {
             sprintf(param_name, "chan_multiSF_%i.if", i);
             ifconf.freq_hz = (int32_t)json_object_dotget_number(conf, param_name);
             // TODO: handle individual SF enabling and disabling (spread_factor)
+            // Save the intermediate frequencies to global for later use converting packet freq back to spotter number.
+            if (ifconf.rf_chain == 0) {
+                chan_if_hz[0][r0ch++] = ifconf.freq_hz;
+            } else if (ifconf.rf_chain == 1) {
+                chan_if_hz[1][r1ch++] = ifconf.freq_hz;
+            }
             MSG("INFO: LoRa multi-SF channel %i enabled, radio %i selected, IF %i Hz, 125 kHz bandwidth, SF 7 to 12\n", i, ifconf.rf_chain, ifconf.freq_hz);
         }
         /* all parameters parsed, submitting configuration to the HAL */
@@ -403,6 +414,8 @@ int main(int argc, char **argv)
     struct timespec fetch_time;
     char fetch_timestamp[30];
     struct tm * x;
+    /* buffer for each message to be sent to the client */
+    char tx_msg[100];
 
     /* parse command line options */
     while ((i = getopt (argc, argv, "hr:")) != -1) {
@@ -501,8 +514,10 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    /* main loop */
+    /* Calculate the packet rx frequencies we expect */
 
+
+    /* main loop */
     while(1) {
         unsigned int clientlen = sizeof(loraclient);
         /* Wait for client connection */
@@ -537,7 +552,10 @@ int main(int argc, char **argv)
                    (p->bandwidth == BW_125KHZ) && (p->datarate == DR_LORA_SF7) &&
                    (p->coderate == CR_LORA_4_5) {
                     // Packet meets all our criteria. Time to forward it to the network.
-                    
+                    switch(p->freq_hz) {
+                        case 9
+                    memset(tx_msg, 0, sizeof(tx_msg)); // Zero out our message buffer
+                    sprintf(tx_msg, "#,%d,%lu,%ld%ld%ld,", 
                 }
 
                 /* writing packet RSSI */
