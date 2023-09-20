@@ -105,6 +105,8 @@ int parse_SX1301_configuration(const char * conf_file) {
     JSON_Value *val;
     uint32_t sf, bw;
 
+    /* Fill the channel if array with a placeholder value to later determine if the json section was absent */
+    memset(chan_if_hz, 0x7FFFFFFF, sizeof(chan_if_hz));
     /* try to parse JSON */
     root_val = json_parse_file_with_comments(conf_file);
     root = json_value_get_object(root_val);
@@ -494,7 +496,7 @@ int main(int argc, char **argv)
     int serversock, clientsock;
     struct sockaddr_in loraserver, loraclient;
 
-    if ((serversock = socket(PF_INET, SOCK_STREAM, IPPPROTO_TCP)) < 0) {
+    if ((serversock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
         MSG("ERROR: failed to create network socket, exiting\n");
         return EXIT_FAILURE;
     }
@@ -515,7 +517,29 @@ int main(int argc, char **argv)
     }
 
     /* Calculate the packet rx frequencies we expect */
-
+    int32_t chanlist[8];
+    const uint8_t radio_channels = 4;
+    memset(chanlist, 0, sizeof(chanlist));
+    for (int k=0; k < ARRAY_SIZE(chanlist); k++) {
+        MSG("DEBUG: k = %d\n", k);
+        uint8_t radion = (k / radio_channels);
+        uint8_t rchannel = (k % radio_channels);
+        int32_t ifreq = chan_if_hz[radion][rchannel];
+        int32_t cfreq = radio_freqs[radion];
+        if (cfreq == 0) {
+            MSG("ERROR: Radio %d frequency not set!", radion);
+            return EXIT_FAILURE;
+        }
+        if (ifreq == 0) {
+        }
+        chanlist[k] = cfreq + ifreq;
+    }
+    // Function to pass to qsort to get a list of ints sorted.
+    int cmpfunc (const void * a, const void * b) {
+       return ( *(int*)a - *(int*)b );
+    }
+    // Sort our channel list
+    qsort(chanlist, ARRAY_SIZE(chanlist), sizeof(int32_t), cmpfunc);
 
     /* main loop */
     while(1) {
@@ -548,14 +572,13 @@ int main(int argc, char **argv)
             for (i=0; i < nb_pkt; ++i) {
                 p = &rxpkt[i];
 
-                if (p->status == STAT_CRC_OK) && (p->modulation == MOD_LORA) &&
+                if ((p->status == STAT_CRC_OK) && (p->modulation == MOD_LORA) &&
                    (p->bandwidth == BW_125KHZ) && (p->datarate == DR_LORA_SF7) &&
-                   (p->coderate == CR_LORA_4_5) {
+                   (p->coderate == CR_LORA_4_5)) {
                     // Packet meets all our criteria. Time to forward it to the network.
-                    switch(p->freq_hz) {
-                        case 9
-                    memset(tx_msg, 0, sizeof(tx_msg)); // Zero out our message buffer
-                    sprintf(tx_msg, "#,%d,%lu,%ld%ld%ld,", 
+
+                    memset(tx_msg, 0, ARRAY_SIZE(tx_msg)); // Zero out our message buffer
+                   // sprintf(tx_msg, "#,%d,%lu,%ld%ld%ld,", );
                 }
 
                 /* writing packet RSSI */
