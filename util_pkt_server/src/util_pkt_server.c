@@ -563,87 +563,84 @@ int main(int argc, char **argv)
 
 
     /* main loop */
-    while(1) {
-
-        /* While a client is connected keep forwarding packets from the RAK module to the client. */
-        while ((quit_sig != 1) && (exit_sig != 1)) {
-            if (connected == 0) {
-                // Wait for a new client to connect.
-                MSG("INFO: Waiting for a client to connect.\n");
-                unsigned int clientlen = sizeof(loraclient);
-                /* Wait for client connection */
-                if ((clientsock = accept(serversock, (struct sockaddr *) &loraclient, &clientlen)) < 0) {
-                    MSG("ERROR: failed to accept client connection, exiting\n");
-                    return EXIT_FAILURE;
-                }
-                /* A client is now connected */
-                MSG("INFO: Client connected: %s\n", inet_ntoa(loraclient.sin_addr));
-
-                char hellomsg[] = "Hello there!\n";
-                send(clientsock, hellomsg, sizeof(hellomsg), 0);
-                connected = 1;
-            }
-            /* fetch packets */
-            nb_pkt = lgw_receive(ARRAY_SIZE(rxpkt), rxpkt);
-            MSG("DEBUG: nb_pkt = %d\n", nb_pkt);
-            if (nb_pkt == LGW_HAL_ERROR) {
-                MSG("ERROR: failed packet fetch, exiting\n");
+    /* While a client is connected keep forwarding packets from the RAK module to the client. */
+    while ((quit_sig != 1) && (exit_sig != 1)) {
+        MSG("DEBUG: Start of inner loop.\n");
+        if (connected == 0) {
+            // Wait for a new client to connect.
+            MSG("INFO: Waiting for a client to connect.\n");
+            unsigned int clientlen = sizeof(loraclient);
+            /* Wait for client connection */
+            if ((clientsock = accept(serversock, (struct sockaddr *) &loraclient, &clientlen)) < 0) {
+                MSG("ERROR: failed to accept client connection, exiting\n");
                 return EXIT_FAILURE;
-            } else if (nb_pkt == 0) {
-                clock_nanosleep(CLOCK_MONOTONIC, 0, &sleep_time, NULL); /* wait a short time if no packets */
+            }
+            /* A client is now connected */
+            MSG("INFO: Client connected: %s\n", inet_ntoa(loraclient.sin_addr));
+
+            char hellomsg[] = "Hello there!\n";
+            send(clientsock, hellomsg, sizeof(hellomsg), 0);
+            connected = 1;
+        }
+        /* fetch packets */
+        MSG("DEBUG: Starting lgw_receive\n");
+        nb_pkt = lgw_receive(ARRAY_SIZE(rxpkt), rxpkt);
+        MSG("DEBUG: nb_pkt = %d\n(lgw_receive is done)\n", nb_pkt);
+        if (nb_pkt == LGW_HAL_ERROR) {
+            MSG("ERROR: failed packet fetch, exiting\n");
+            return EXIT_FAILURE;
+        } else if (nb_pkt == 0) {
+            clock_nanosleep(CLOCK_MONOTONIC, 0, &sleep_time, NULL); /* wait a short time if no packets */
+        }
+
+        MSG("Checking if client is still connected.\n");
+        // Check if the client is still connected.
+        int received = -1;
+        if ((received = recv(clientsock, rx_msg, RXBUFLEN, MSG_DONTWAIT)) < 0) {
+            if (errno == EBADF) {
+                connected = 0;
+                break; // Break out of the packet processing loop to reconnect to a client.
+            } else if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+                // No data was in the buffer so keep working on other stuff.
+                MSG("DEBUG: No data was in the Rx buffer so keep processing packets.\n");
             } else {
-                /* local timestamp generation until we get accurate GPS time */
-                clock_gettime(CLOCK_REALTIME, &fetch_time);
-                x = gmtime(&(fetch_time.tv_sec));
-                sprintf(fetch_timestamp,"%04i-%02i-%02i %02i:%02i:%02i.%03liZ",(x->tm_year)+1900,(x->tm_mon)+1,x->tm_mday,x->tm_hour,x->tm_min,x->tm_sec,(fetch_time.tv_nsec)/1000000); /* ISO 8601 format */
+                MSG("ERROR: recv reported error code: %s\n", strerror(errno));
+                return EXIT_FAILURE;
             }
+        } else if (received == 0) {
+            MSG("INFO: Client disconnected.\n");
+            // The client disconnected!
+            close(clientsock); // Don't forget to close the socket when the remote end disconnects!
+        }
 
-            // Check if the client is still connected.
-            int received = -1;
-            if ((received = recv(clientsock, rx_msg, RXBUFLEN, MSG_DONTWAIT)) < 0) {
-                if (errno == EBADF) {
-                    connected = 0;
-                    break; // Break out of the packet processing loop to reconnect to a client.
-                } else if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-                    // No data was in the buffer so keep working on other stuff.
-                } else {
-                    MSG("ERROR: recv reported error code: %s\n", strerror(errno));
-                    return EXIT_FAILURE;
-                }
-            } else if (received == 0) {
-                MSG("INFO: Client disconnected.\n");
-                // The client disconnected!
-                close(clientsock); // Don't forget to close the socket when the remote end disconnects!
-            }
+        MSG("DEBUG: Process packets if there are any.\n");
+        /* process packets */
+        for (i=0; i < nb_pkt; ++i) {
+            MSG("INFO: Processing Packet %d\n", i);
+            p = &rxpkt[i];
 
-            /* process packets */
-            for (i=0; i < nb_pkt; ++i) {
-                MSG("INFO: Processing Packet %d\n", i);
-                p = &rxpkt[i];
-
-                // Only process and forward packets that meet our criteria.
-                if ((p->status == STAT_CRC_OK) && (p->modulation == MOD_LORA) &&
-                   (p->bandwidth == BW_125KHZ) && (p->datarate == DR_LORA_SF7) &&
-                   (p->coderate == CR_LORA_4_5)) {
-                    MSG("INFO: Received a packet!\n");
-                    // Packet meets all our criteria. Time to forward it to the network.
-                    int spotn = -1;
-                    for (unsigned int l=0; l < ARRAY_SIZE(chanlist); l++) {
-                        if ((int64_t)chanlist[l] == (int64_t)p->freq_hz) {
-                            spotn = l;
-                        }
+            // Only process and forward packets that meet our criteria.
+            if ((p->status == STAT_CRC_OK) && (p->modulation == MOD_LORA) &&
+               (p->bandwidth == BW_125KHZ) && (p->datarate == DR_LORA_SF7) &&
+               (p->coderate == CR_LORA_4_5)) {
+                MSG("INFO: Received a packet!\n");
+                // Packet meets all our criteria. Time to forward it to the network.
+                int spotn = -1;
+                for (unsigned int l=0; l < ARRAY_SIZE(chanlist); l++) {
+                    if ((int64_t)chanlist[l] == (int64_t)p->freq_hz) {
+                        spotn = l;
                     }
-                    if (spotn == -1) {
-                        MSG("INFO: Somehow received packet on unknown frequency (%d Hz)!?\n", p->freq_hz);
-                        continue; // Skip the rest of the steps to process this packet.
-                    }
-                    // Load the received data into a union/struct to parse.
-                    memcpy(spotterdata.bytes, p->payload, p->size);
-
-                    memset(tx_msg, 0, ARRAY_SIZE(tx_msg)); // Zero out our message buffer
-                    sprintf(tx_msg, "#,%d,%lu,%ld,%ld,%ld,", spotn, spotterdata.d.timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
-                    send(clientsock, tx_msg, sizeof(tx_msg), 0);
                 }
+                if (spotn == -1) {
+                    MSG("INFO: Somehow received packet on unknown frequency (%d Hz)!?\n", p->freq_hz);
+                    continue; // Skip the rest of the steps to process this packet.
+                }
+                // Load the received data into a union/struct to parse.
+                memcpy(spotterdata.bytes, p->payload, p->size);
+
+                memset(tx_msg, 0, ARRAY_SIZE(tx_msg)); // Zero out our message buffer
+                sprintf(tx_msg, "#,%d,%lu,%ld,%ld,%ld,", spotn, spotterdata.d.timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
+                send(clientsock, tx_msg, sizeof(tx_msg), 0);
             }
         }
     }
