@@ -17,7 +17,8 @@ include $(LGW_PATH)/library.cfg
 CC := $(CROSS_COMPILE)gcc
 AR := $(CROSS_COMPILE)ar
 
-CFLAGS=-O2 -Wall -Wextra -std=c99 -Iinc -I.
+#CFLAGS=-O2 -Wall -Wextra -std=c99 -Iinc -I.
+CFLAGS=-O0 -g -Wall -Wextra -std=c99 -Iinc -I.
 
 OBJDIR = obj
 

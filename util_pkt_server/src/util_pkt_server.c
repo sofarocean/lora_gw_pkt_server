@@ -67,6 +67,8 @@ char log_file_name[64];
 
 int32_t radio_freqs[2];
 int32_t chan_if_hz[2][4];
+
+#define INT32MAX 0x7FFFFFFF
 /* -------------------------------------------------------------------------- */
 /* --- PRIVATE FUNCTIONS DECLARATION ---------------------------------------- */
 
@@ -80,8 +82,15 @@ void open_log(void);
 
 void usage (void);
 
+int cmpfunc (const void * a, const void * b);
+
 /* -------------------------------------------------------------------------- */
 /* --- PRIVATE FUNCTIONS DEFINITION ----------------------------------------- */
+
+// Function to pass to qsort to get a list of ints sorted.
+int cmpfunc (const void * a, const void * b) {
+   return ( *(int*)a - *(int*)b );
+}
 
 static void sig_handler(int sigio) {
     if (sigio == SIGQUIT) {
@@ -106,7 +115,11 @@ int parse_SX1301_configuration(const char * conf_file) {
     uint32_t sf, bw;
 
     /* Fill the channel if array with a placeholder value to later determine if the json section was absent */
-    memset(chan_if_hz, 0x7FFFFFFF, sizeof(chan_if_hz));
+    for (int i=0; i < 2; i++) {
+        for (int j=0; j < 4; j++) {
+            chan_if_hz[i][j] = INT32MAX;
+        }
+    }
     /* try to parse JSON */
     root_val = json_parse_file_with_comments(conf_file);
     root = json_value_get_object(root_val);
@@ -399,13 +412,11 @@ int main(int argc, char **argv)
 
     /* clock and log rotation management */
     int log_rotate_interval = 3600; /* by default, rotation every hour */
-    int time_check = 0; /* variable used to limit the number of calls to time() function */
     unsigned long pkt_in_log = 0; /* count the number of packet written in each log file */
 
     /* configuration file related */
     const char global_conf_fname[] = "global_conf.json"; /* contain global (typ. network-wide) configuration */
     const char local_conf_fname[] = "local_conf.json"; /* contain node specific configuration, overwrite global parameters for parameters that are defined in both */
-    const char debug_conf_fname[] = "debug_conf.json"; /* if present, all other configuration files are ignored */
 
     /* allocate memory for packet fetching and processing */
     struct lgw_pkt_rx_s rxpkt[16]; /* array containing up to 16 inbound packets metadata */
@@ -418,6 +429,16 @@ int main(int argc, char **argv)
     struct tm * x;
     /* buffer for each message to be sent to the client */
     char tx_msg[100];
+    /* Struct to hold data from the spotters */
+    union spotterdata_u {
+        uint8_t bytes[16];
+        struct  {
+            long unsigned int timestamp;
+            long int X;
+            long int Y;
+            long int Z;
+        } d;
+    } spotterdata;
 
     /* parse command line options */
     while ((i = getopt (argc, argv, "hr:")) != -1) {
@@ -451,28 +472,18 @@ int main(int argc, char **argv)
     sigaction(SIGTERM, &sigact, NULL);
 
     /* configuration files management */
-    if (access(debug_conf_fname, R_OK) == 0) {
-    /* if there is a debug conf, parse only the debug conf */
-        MSG("INFO: found debug configuration file %s, other configuration files will be ignored\n", debug_conf_fname);
-        parse_SX1301_configuration(debug_conf_fname);
-        parse_gateway_configuration(debug_conf_fname);
-    } else if (access(global_conf_fname, R_OK) == 0) {
-    /* if there is a global conf, parse it and then try to parse local conf  */
+    if (access(global_conf_fname, R_OK) == 0) {
+    /* if there is a global conf, parse it */
         MSG("INFO: found global configuration file %s, trying to parse it\n", global_conf_fname);
         parse_SX1301_configuration(global_conf_fname);
         parse_gateway_configuration(global_conf_fname);
-        if (access(local_conf_fname, R_OK) == 0) {
-            MSG("INFO: found local configuration file %s, trying to parse it\n", local_conf_fname);
-            parse_SX1301_configuration(local_conf_fname);
-            parse_gateway_configuration(local_conf_fname);
-        }
     } else if (access(local_conf_fname, R_OK) == 0) {
     /* if there is only a local conf, parse it and that's all */
         MSG("INFO: found local configuration file %s, trying to parse it\n", local_conf_fname);
         parse_SX1301_configuration(local_conf_fname);
         parse_gateway_configuration(local_conf_fname);
     } else {
-        MSG("ERROR: failed to find any configuration file named %s, %s or %s\n", global_conf_fname, local_conf_fname, debug_conf_fname);
+        MSG("ERROR: failed to find any configuration file named %s, or %s\n", global_conf_fname, local_conf_fname);
         return EXIT_FAILURE;
     }
 
@@ -482,7 +493,8 @@ int main(int argc, char **argv)
         MSG("INFO: concentrator started, packet can now be received\n");
     } else {
         MSG("ERROR: failed to start the concentrator\n");
-        return EXIT_FAILURE;
+        //return EXIT_FAILURE; //TODO: Uncomment this line before using this outside GDB!!!
+        #warning Uncomment the above line before actually building this!!
     }
 
     /* transform the MAC address into a string */
@@ -520,24 +532,24 @@ int main(int argc, char **argv)
     int32_t chanlist[8];
     const uint8_t radio_channels = 4;
     memset(chanlist, 0, sizeof(chanlist));
-    for (int k=0; k < ARRAY_SIZE(chanlist); k++) {
+    for (unsigned int k=0; k < ARRAY_SIZE(chanlist); k++) {
         MSG("DEBUG: k = %d\n", k);
         uint8_t radion = (k / radio_channels);
         uint8_t rchannel = (k % radio_channels);
-        int32_t ifreq = chan_if_hz[radion][rchannel];
         int32_t cfreq = radio_freqs[radion];
+        int32_t ifreq = chan_if_hz[radion][rchannel];
         if (cfreq == 0) {
             MSG("ERROR: Radio %d frequency not set!", radion);
             return EXIT_FAILURE;
         }
-        if (ifreq == 0) {
+        if (ifreq == INT32MAX) {
+            MSG("INFO: Radio %d has a missing chan_multiSF_ section in the json file.", radion);
+            chanlist[k] = INT32MAX;
+        } else {
+            chanlist[k] = cfreq + ifreq;
         }
-        chanlist[k] = cfreq + ifreq;
     }
-    // Function to pass to qsort to get a list of ints sorted.
-    int cmpfunc (const void * a, const void * b) {
-       return ( *(int*)a - *(int*)b );
-    }
+
     // Sort our channel list
     qsort(chanlist, ARRAY_SIZE(chanlist), sizeof(int32_t), cmpfunc);
 
@@ -574,11 +586,23 @@ int main(int argc, char **argv)
 
                 if ((p->status == STAT_CRC_OK) && (p->modulation == MOD_LORA) &&
                    (p->bandwidth == BW_125KHZ) && (p->datarate == DR_LORA_SF7) &&
-                   (p->coderate == CR_LORA_4_5)) {
+                   (p->coderate == CR_LORA_4_5) && (p->size == 16)) {
                     // Packet meets all our criteria. Time to forward it to the network.
+                    int spotn = -1;
+                    for (unsigned int l=0; l < ARRAY_SIZE(chanlist); l++) {
+                        if ((int64_t)chanlist[l] == (int64_t)p->freq_hz) {
+                            spotn = l;
+                        }
+                    }
+                    if (spotn == -1) {
+                        MSG("INFO: Somehow received packet on unknown frequency (%d Hz)!?\n", p->freq_hz);
+                        continue; // Skip the rest of the steps to process this packet.
+                    }
+                    // Load the received data into a union/struct to parse.
+                    memcpy(spotterdata.bytes, p->payload, p->size);
 
                     memset(tx_msg, 0, ARRAY_SIZE(tx_msg)); // Zero out our message buffer
-                   // sprintf(tx_msg, "#,%d,%lu,%ld%ld%ld,", );
+                    sprintf(tx_msg, "#,%d,%lu,%ld,%ld,%ld,", spotn, spotterdata.d.timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
                 }
 
                 /* writing packet RSSI */
