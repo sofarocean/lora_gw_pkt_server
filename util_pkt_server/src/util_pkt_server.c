@@ -40,6 +40,7 @@ Maintainer: Sylvain Miermont
 
 #include "parson.h"
 #include "loragw_hal.h"
+#include "errno.h"      /* network socket error handling */
 
 /* -------------------------------------------------------------------------- */
 /* --- PRIVATE MACROS ------------------------------------------------------- */
@@ -69,6 +70,7 @@ int32_t radio_freqs[2];
 int32_t chan_if_hz[2][4];
 
 #define INT32MAX 0x7FFFFFFF
+#define RXBUFLEN 1024
 /* -------------------------------------------------------------------------- */
 /* --- PRIVATE FUNCTIONS DECLARATION ---------------------------------------- */
 
@@ -407,7 +409,7 @@ void usage(void) {
 
 int main(int argc, char **argv)
 {
-    int i, j; /* loop and temporary variables */
+    int i; /* loop and temporary variables */
     struct timespec sleep_time = {0, 3000000}; /* 3 ms */
 
     /* clock and log rotation management */
@@ -439,6 +441,12 @@ int main(int argc, char **argv)
             long int Z;
         } d;
     } spotterdata;
+
+    /* Network receive buffer */
+    char rx_msg[RXBUFLEN];
+
+    /* Keep track of our connection status */
+    int connected = 0;
 
     /* parse command line options */
     while ((i = getopt (argc, argv, "hr:")) != -1) {
@@ -493,7 +501,7 @@ int main(int argc, char **argv)
         MSG("INFO: concentrator started, packet can now be received\n");
     } else {
         MSG("ERROR: failed to start the concentrator\n");
-        //return EXIT_FAILURE; //TODO: Uncomment this line before using this outside GDB!!!
+        return EXIT_FAILURE; //TODO: Uncomment this line before using this outside GDB!!!
         #warning Uncomment the above line before actually building this!!
     }
 
@@ -553,21 +561,31 @@ int main(int argc, char **argv)
     // Sort our channel list
     qsort(chanlist, ARRAY_SIZE(chanlist), sizeof(int32_t), cmpfunc);
 
+
     /* main loop */
     while(1) {
-        unsigned int clientlen = sizeof(loraclient);
-        /* Wait for client connection */
-        if ((clientsock = accept(serversock, (struct sockaddr *) &loraclient, &clientlen)) < 0) {
-            MSG("ERROR: failed to accept client connection, exiting\n");
-            return EXIT_FAILURE;
-        }
-        /* A client is now connected */
-        MSG("INFO: Client connected: %s\n", inet_ntoa(loraclient.sin_addr));
 
         /* While a client is connected keep forwarding packets from the RAK module to the client. */
         while ((quit_sig != 1) && (exit_sig != 1)) {
+            if (connected == 0) {
+                // Wait for a new client to connect.
+                MSG("INFO: Waiting for a client to connect.\n");
+                unsigned int clientlen = sizeof(loraclient);
+                /* Wait for client connection */
+                if ((clientsock = accept(serversock, (struct sockaddr *) &loraclient, &clientlen)) < 0) {
+                    MSG("ERROR: failed to accept client connection, exiting\n");
+                    return EXIT_FAILURE;
+                }
+                /* A client is now connected */
+                MSG("INFO: Client connected: %s\n", inet_ntoa(loraclient.sin_addr));
+
+                char hellomsg[] = "Hello there!\n";
+                send(clientsock, hellomsg, sizeof(hellomsg), 0);
+                connected = 1;
+            }
             /* fetch packets */
             nb_pkt = lgw_receive(ARRAY_SIZE(rxpkt), rxpkt);
+            MSG("DEBUG: nb_pkt = %d\n", nb_pkt);
             if (nb_pkt == LGW_HAL_ERROR) {
                 MSG("ERROR: failed packet fetch, exiting\n");
                 return EXIT_FAILURE;
@@ -580,13 +598,34 @@ int main(int argc, char **argv)
                 sprintf(fetch_timestamp,"%04i-%02i-%02i %02i:%02i:%02i.%03liZ",(x->tm_year)+1900,(x->tm_mon)+1,x->tm_mday,x->tm_hour,x->tm_min,x->tm_sec,(fetch_time.tv_nsec)/1000000); /* ISO 8601 format */
             }
 
+            // Check if the client is still connected.
+            int received = -1;
+            if ((received = recv(clientsock, rx_msg, RXBUFLEN, MSG_DONTWAIT)) < 0) {
+                if (errno == EBADF) {
+                    connected = 0;
+                    break; // Break out of the packet processing loop to reconnect to a client.
+                } else if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+                    // No data was in the buffer so keep working on other stuff.
+                } else {
+                    MSG("ERROR: recv reported error code: %s\n", strerror(errno));
+                    return EXIT_FAILURE;
+                }
+            } else if (received == 0) {
+                MSG("INFO: Client disconnected.\n");
+                // The client disconnected!
+                close(clientsock); // Don't forget to close the socket when the remote end disconnects!
+            }
+
             /* process packets */
             for (i=0; i < nb_pkt; ++i) {
+                MSG("INFO: Processing Packet %d\n", i);
                 p = &rxpkt[i];
 
+                // Only process and forward packets that meet our criteria.
                 if ((p->status == STAT_CRC_OK) && (p->modulation == MOD_LORA) &&
                    (p->bandwidth == BW_125KHZ) && (p->datarate == DR_LORA_SF7) &&
-                   (p->coderate == CR_LORA_4_5) && (p->size == 16)) {
+                   (p->coderate == CR_LORA_4_5)) {
+                    MSG("INFO: Received a packet!\n");
                     // Packet meets all our criteria. Time to forward it to the network.
                     int spotn = -1;
                     for (unsigned int l=0; l < ARRAY_SIZE(chanlist); l++) {
@@ -603,23 +642,12 @@ int main(int argc, char **argv)
 
                     memset(tx_msg, 0, ARRAY_SIZE(tx_msg)); // Zero out our message buffer
                     sprintf(tx_msg, "#,%d,%lu,%ld,%ld,%ld,", spotn, spotterdata.d.timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
-                }
-
-                /* writing packet RSSI */
-                //fprintf(log_file, "%+.0f,", p->rssi);
-
-                /* writing packet average SNR */
-                //fprintf(log_file, "%+5.1f,", p->snr);
-
-                /* writing hex-encoded payload (bundled in 32-bit words) */
-                fputs("\"", log_file);
-                for (j = 0; j < p->size; ++j) {
-                    if ((j > 0) && (j%4 == 0)) fputs("-", log_file);
-                    fprintf(log_file, "%02X", p->payload[j]);
+                    send(clientsock, tx_msg, sizeof(tx_msg), 0);
                 }
             }
         }
     }
+
     if (exit_sig == 1) {
         /* clean up before leaving */
         i = lgw_stop();
@@ -630,6 +658,9 @@ int main(int argc, char **argv)
         }
         fclose(log_file);
         MSG("INFO: log file %s closed, %lu packet(s) recorded\n", log_file_name, pkt_in_log);
+
+        /* Make sure the socket is closed */
+        close(clientsock); // This is probably the wrong way to do this!!!
     }
 
     MSG("INFO: Exiting packet logger program\n");
