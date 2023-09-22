@@ -13,10 +13,10 @@
             "tx_freq_max": 928000000
         },
         "radio_1": {
+            "rssi_offset": -166.0,
             "enable": true,
             "type": "SX1257",
-	    "freq": 905000000,
-            "rssi_offset": -166.0,
+            "freq": 905000000,
             "tx_enable": false
         },
         "chan_multiSF_0": {

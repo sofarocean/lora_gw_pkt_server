@@ -63,26 +63,22 @@ char lgwm_str[17];
 /* clock and log file management */
 time_t now_time;
 time_t log_start_time;
-FILE * log_file = NULL;
 char log_file_name[64];
 
 int32_t radio_freqs[2];
 int32_t chan_if_hz[2][4];
 
+/* -------------------------------------------------------------------------- */
+/* --- Custom Constants ----------------------------------------------------- */
 #define INT32MAX 0x7FFFFFFF
 #define RXBUFLEN 1024
+
 /* -------------------------------------------------------------------------- */
 /* --- PRIVATE FUNCTIONS DECLARATION ---------------------------------------- */
 
 static void sig_handler(int sigio);
 
 int parse_SX1301_configuration(const char * conf_file);
-
-int parse_gateway_configuration(const char * conf_file);
-
-void open_log(void);
-
-void usage (void);
 
 int cmpfunc (const void * a, const void * b);
 
@@ -337,84 +333,12 @@ int parse_SX1301_configuration(const char * conf_file) {
     return 0;
 }
 
-int parse_gateway_configuration(const char * conf_file) {
-    const char conf_obj[] = "gateway_conf";
-    JSON_Value *root_val;
-    JSON_Object *root = NULL;
-    JSON_Object *conf = NULL;
-    const char *str; /* pointer to sub-strings in the JSON data */
-    unsigned long long ull = 0;
-
-    /* try to parse JSON */
-    root_val = json_parse_file_with_comments(conf_file);
-    root = json_value_get_object(root_val);
-    if (root == NULL) {
-        MSG("ERROR: %s id not a valid JSON file\n", conf_file);
-        exit(EXIT_FAILURE);
-    }
-    conf = json_object_get_object(root, conf_obj);
-    if (conf == NULL) {
-        MSG("INFO: %s does not contain a JSON object named %s\n", conf_file, conf_obj);
-        return -1;
-    } else {
-        MSG("INFO: %s does contain a JSON object named %s, parsing gateway parameters\n", conf_file, conf_obj);
-    }
-
-    /* getting network parameters (only those necessary for the packet logger) */
-    str = json_object_get_string(conf, "gateway_ID");
-    if (str != NULL) {
-        sscanf(str, "%llx", &ull);
-        lgwm = ull;
-        MSG("INFO: gateway MAC address is configured to %016llX\n", ull);
-    }
-
-    json_value_free(root_val);
-    return 0;
-}
-
-void open_log(void) {
-    int i;
-    char iso_date[20];
-
-    strftime(iso_date,ARRAY_SIZE(iso_date),"%Y%m%dT%H%M%SZ",gmtime(&now_time)); /* format yyyymmddThhmmssZ */
-    log_start_time = now_time; /* keep track of when the log was started, for log rotation */
-
-    sprintf(log_file_name, "pktlog_%s_%s.csv", lgwm_str, iso_date);
-    log_file = fopen(log_file_name, "a"); /* create log file, append if file already exist */
-    if (log_file == NULL) {
-        MSG("ERROR: impossible to create log file %s\n", log_file_name);
-        exit(EXIT_FAILURE);
-    }
-
-    i = fprintf(log_file, "\"gateway ID\",\"node MAC\",\"UTC timestamp\",\"us count\",\"frequency\",\"RF chain\",\"RX chain\",\"status\",\"size\",\"modulation\",\"bandwidth\",\"datarate\",\"coderate\",\"RSSI\",\"SNR\",\"payload\"\n");
-    if (i < 0) {
-        MSG("ERROR: impossible to write to log file %s\n", log_file_name);
-        exit(EXIT_FAILURE);
-    }
-
-    MSG("INFO: Now writing to log file %s\n", log_file_name);
-    return;
-}
-
-/* describe command line options */
-void usage(void) {
-    printf("*** Library version information ***\n%s\n\n", lgw_version_info());
-    printf( "Available options:\n");
-    printf( " -h print this help\n");
-    printf( " -r <int> rotate log file every N seconds (-1 disable log rotation)\n");
-}
-
 /* -------------------------------------------------------------------------- */
 /* --- MAIN FUNCTION -------------------------------------------------------- */
 
-int main(int argc, char **argv)
+int main()
 {
     int i; /* loop and temporary variables */
-    struct timespec sleep_time = {0, 3000000}; /* 3 ms */
-
-    /* clock and log rotation management */
-    int log_rotate_interval = 3600; /* by default, rotation every hour */
-    unsigned long pkt_in_log = 0; /* count the number of packet written in each log file */
 
     /* configuration file related */
     const char global_conf_fname[] = "global_conf.json"; /* contain global (typ. network-wide) configuration */
@@ -444,29 +368,6 @@ int main(int argc, char **argv)
     /* Keep track of our connection status */
     int connected = 0;
 
-    /* parse command line options */
-    while ((i = getopt (argc, argv, "hr:")) != -1) {
-        switch (i) {
-            case 'h':
-                usage();
-                return EXIT_FAILURE;
-                break;
-
-            case 'r':
-                log_rotate_interval = atoi(optarg);
-                if ((log_rotate_interval == 0) || (log_rotate_interval < -1)) {
-                    MSG( "ERROR: Invalid argument for -r option\n");
-                    return EXIT_FAILURE;
-                }
-                break;
-
-            default:
-                MSG("ERROR: argument parsing use -h option for help\n");
-                usage();
-                return EXIT_FAILURE;
-        }
-    }
-
     /* configure signal handling */
     sigemptyset(&sigact.sa_mask);
     sigact.sa_flags = 0;
@@ -480,12 +381,10 @@ int main(int argc, char **argv)
     /* if there is a global conf, parse it */
         MSG("INFO: found global configuration file %s, trying to parse it\n", global_conf_fname);
         parse_SX1301_configuration(global_conf_fname);
-        parse_gateway_configuration(global_conf_fname);
     } else if (access(local_conf_fname, R_OK) == 0) {
     /* if there is only a local conf, parse it and that's all */
         MSG("INFO: found local configuration file %s, trying to parse it\n", local_conf_fname);
         parse_SX1301_configuration(local_conf_fname);
-        parse_gateway_configuration(local_conf_fname);
     } else {
         MSG("ERROR: failed to find any configuration file named %s, or %s\n", global_conf_fname, local_conf_fname);
         return EXIT_FAILURE;
@@ -498,15 +397,11 @@ int main(int argc, char **argv)
     } else {
         MSG("ERROR: failed to start the concentrator\n");
         return EXIT_FAILURE; //TODO: Uncomment this line before using this outside GDB!!!
-        #warning Uncomment the above line before actually building this!!
+        //#warning Uncomment the above line before actually building this!!
     }
 
     /* transform the MAC address into a string */
     sprintf(lgwm_str, "%08X%08X", (uint32_t)(lgwm >> 32), (uint32_t)(lgwm & 0xFFFFFFFF));
-
-    /* opening log file and writing CSV header*/
-    time(&now_time);
-    open_log();
 
     /* Set things up to serve data over the network */
     int serversock, clientsock;
@@ -572,7 +467,7 @@ int main(int argc, char **argv)
             /* A client is now connected */
             MSG("INFO: Client connected: %s\n", inet_ntoa(loraclient.sin_addr));
 
-            char hellomsg[] = "Hello there!\n";
+            char hellomsg[] = "Connected...\n";
             send(clientsock, hellomsg, sizeof(hellomsg), 0);
             connected = 1;
         }
@@ -581,8 +476,6 @@ int main(int argc, char **argv)
         if (nb_pkt == LGW_HAL_ERROR) {
             MSG("ERROR: failed packet fetch, exiting\n");
             return EXIT_FAILURE;
-        } else if (nb_pkt == 0) {
-            clock_nanosleep(CLOCK_MONOTONIC, 0, &sleep_time, NULL); /* wait a short time if no packets */
         }
 
         // Check if the client is still connected.
@@ -614,9 +507,7 @@ int main(int argc, char **argv)
                 // Packet meets all our criteria. Time to forward it to the network.
                 int spotn = -1;
                 for (unsigned int l=0; l < ARRAY_SIZE(chanlist); l++) {
-                    if ((int64_t)chanlist[l] == (int64_t)p->freq_hz) {
-                        spotn = l;
-                    }
+                    if ((int64_t)chanlist[l] == (int64_t)p->freq_hz) spotn = l;
                 }
                 if (spotn == -1) {
                     MSG("INFO: Somehow received packet on unknown frequency (%d Hz)!?\n", p->freq_hz);
@@ -640,8 +531,6 @@ int main(int argc, char **argv)
         } else {
             MSG("WARNING: failed to stop concentrator successfully\n");
         }
-        fclose(log_file);
-        MSG("INFO: log file %s closed, %lu packet(s) recorded\n", log_file_name, pkt_in_log);
 
         /* Make sure the socket is closed */
         close(clientsock); // This is probably the wrong way to do this!!!
