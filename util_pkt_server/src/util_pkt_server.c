@@ -425,10 +425,6 @@ int main(int argc, char **argv)
     struct lgw_pkt_rx_s *p; /* pointer on a RX packet */
     int nb_pkt;
 
-    /* local timestamp variables until we get accurate GPS time */
-    struct timespec fetch_time;
-    char fetch_timestamp[30];
-    struct tm * x;
     /* buffer for each message to be sent to the client */
     char tx_msg[100];
     /* Struct to hold data from the spotters */
@@ -541,7 +537,6 @@ int main(int argc, char **argv)
     const uint8_t radio_channels = 4;
     memset(chanlist, 0, sizeof(chanlist));
     for (unsigned int k=0; k < ARRAY_SIZE(chanlist); k++) {
-        MSG("DEBUG: k = %d\n", k);
         uint8_t radion = (k / radio_channels);
         uint8_t rchannel = (k % radio_channels);
         int32_t cfreq = radio_freqs[radion];
@@ -555,17 +550,16 @@ int main(int argc, char **argv)
             chanlist[k] = INT32MAX;
         } else {
             chanlist[k] = cfreq + ifreq;
+            MSG("INFO: Spotter %d: LoRa receiver set to %dHz.\n", k, chanlist[k]);
         }
     }
 
     // Sort our channel list
     qsort(chanlist, ARRAY_SIZE(chanlist), sizeof(int32_t), cmpfunc);
 
-
     /* main loop */
     /* While a client is connected keep forwarding packets from the RAK module to the client. */
     while ((quit_sig != 1) && (exit_sig != 1)) {
-        MSG("DEBUG: Start of inner loop.\n");
         if (connected == 0) {
             // Wait for a new client to connect.
             MSG("INFO: Waiting for a client to connect.\n");
@@ -583,9 +577,7 @@ int main(int argc, char **argv)
             connected = 1;
         }
         /* fetch packets */
-        MSG("DEBUG: Starting lgw_receive\n");
         nb_pkt = lgw_receive(ARRAY_SIZE(rxpkt), rxpkt);
-        MSG("DEBUG: nb_pkt = %d\n(lgw_receive is done)\n", nb_pkt);
         if (nb_pkt == LGW_HAL_ERROR) {
             MSG("ERROR: failed packet fetch, exiting\n");
             return EXIT_FAILURE;
@@ -593,16 +585,14 @@ int main(int argc, char **argv)
             clock_nanosleep(CLOCK_MONOTONIC, 0, &sleep_time, NULL); /* wait a short time if no packets */
         }
 
-        MSG("Checking if client is still connected.\n");
         // Check if the client is still connected.
         int received = -1;
         if ((received = recv(clientsock, rx_msg, RXBUFLEN, MSG_DONTWAIT)) < 0) {
             if (errno == EBADF) {
                 connected = 0;
-                break; // Break out of the packet processing loop to reconnect to a client.
+                continue; // Break out of the packet processing loop to reconnect to a client.
             } else if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
                 // No data was in the buffer so keep working on other stuff.
-                MSG("DEBUG: No data was in the Rx buffer so keep processing packets.\n");
             } else {
                 MSG("ERROR: recv reported error code: %s\n", strerror(errno));
                 return EXIT_FAILURE;
@@ -613,17 +603,14 @@ int main(int argc, char **argv)
             close(clientsock); // Don't forget to close the socket when the remote end disconnects!
         }
 
-        MSG("DEBUG: Process packets if there are any.\n");
         /* process packets */
         for (i=0; i < nb_pkt; ++i) {
-            MSG("INFO: Processing Packet %d\n", i);
             p = &rxpkt[i];
 
             // Only process and forward packets that meet our criteria.
             if ((p->status == STAT_CRC_OK) && (p->modulation == MOD_LORA) &&
                (p->bandwidth == BW_125KHZ) && (p->datarate == DR_LORA_SF7) &&
                (p->coderate == CR_LORA_4_5)) {
-                MSG("INFO: Received a packet!\n");
                 // Packet meets all our criteria. Time to forward it to the network.
                 int spotn = -1;
                 for (unsigned int l=0; l < ARRAY_SIZE(chanlist); l++) {
@@ -660,7 +647,7 @@ int main(int argc, char **argv)
         close(clientsock); // This is probably the wrong way to do this!!!
     }
 
-    MSG("INFO: Exiting packet logger program\n");
+    MSG("INFO: Exiting packet server program\n");
     return EXIT_SUCCESS;
 }
 
