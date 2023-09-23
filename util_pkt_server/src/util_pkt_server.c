@@ -517,7 +517,7 @@ int main()
                 memcpy(spotterdata.bytes, p->payload, p->size);
 
                 memset(tx_msg, 0, ARRAY_SIZE(tx_msg)); // Zero out our message buffer
-                sprintf(tx_msg, "#,%d,%lu,%ld,%ld,%ld,", spotn, spotterdata.d.timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
+                sprintf(tx_msg, "#,%d,%lu,%ld,%ld,%ld\n", spotn, spotterdata.d.timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
                 send(clientsock, tx_msg, sizeof(tx_msg), 0);
             }
         }
