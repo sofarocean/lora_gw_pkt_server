@@ -355,7 +355,7 @@ int main()
     union spotterdata_u {
         uint8_t bytes[16];
         struct  {
-            long unsigned int timestamp;
+            unsigned long int timestamp;
             long int X;
             long int Y;
             long int Z;
@@ -518,7 +518,8 @@ int main()
 
                 memset(tx_msg, 0, ARRAY_SIZE(tx_msg)); // Zero out our message buffer
                 sprintf(tx_msg, "#,%d,%lu,%ld,%ld,%ld\n", spotn, spotterdata.d.timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
-                send(clientsock, tx_msg, sizeof(tx_msg), 0);
+                //sprintf(tx_msg, "#,%d,%llu,%ld,%ld\n", spotn, spotterdata.d.timestamp, spotterdata.d.X, spotterdata.d.Y);
+                send(clientsock, tx_msg, strlen(tx_msg), 0);
             }
         }
     }

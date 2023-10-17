@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/sudo /bin/bash
 
 # Reset iC880a PIN
 SX1301_RESET_BCM_PIN=17
