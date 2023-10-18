@@ -468,8 +468,15 @@ int main()
             MSG("INFO: Client connected: %s\n", inet_ntoa(loraclient.sin_addr));
 
             char hellomsg[] = "Connected...\n";
-            send(clientsock, hellomsg, sizeof(hellomsg), 0);
+            send(clientsock, hellomsg, strlen(hellomsg), 0);
             connected = 1;
+
+            /* Clear the buffer out right after we connect so we don't send old packets to the client */
+            nb_pkt = lgw_receive(ARRAY_SIZE(rxpkt), rxpkt);
+            if (nb_pkt == LGW_HAL_ERROR) {
+                MSG("ERROR: failed packet fetch, exiting\n");
+                return EXIT_FAILURE;
+            }
         }
         /* fetch packets */
         nb_pkt = lgw_receive(ARRAY_SIZE(rxpkt), rxpkt);
