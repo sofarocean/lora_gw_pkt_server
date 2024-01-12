@@ -353,12 +353,13 @@ int main()
     char tx_msg[100];
     /* Struct to hold data from the spotters */
     union spotterdata_u {
-        uint8_t bytes[16];
+        uint8_t bytes[17];
         struct  {
-            unsigned long int timestamp;
-            long int X;
-            long int Y;
-            long int Z;
+            unsigned long int timestamp __attribute__((__packed__));
+            unsigned char timestamp_f __attribute__((__packed__));
+            long int X __attribute__((__packed__));
+            long int Y __attribute__((__packed__));
+            long int Z __attribute__((__packed__));
         } d;
     } spotterdata;
 
@@ -520,12 +521,20 @@ int main()
                     MSG("INFO: Somehow received packet on unknown frequency (%d Hz)!?\n", p->freq_hz);
                     continue; // Skip the rest of the steps to process this packet.
                 }
+                
                 // Load the received data into a union/struct to parse.
                 memcpy(spotterdata.bytes, p->payload, p->size);
-
-                memset(tx_msg, 0, ARRAY_SIZE(tx_msg)); // Zero out our message buffer
-                sprintf(tx_msg, "#,%d,%lu,%ld,%ld,%ld\n", spotn, spotterdata.d.timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
-                //sprintf(tx_msg, "#,%d,%llu,%ld,%ld\n", spotn, spotterdata.d.timestamp, spotterdata.d.X, spotterdata.d.Y);
+                
+                // Combine the timestamp in seconds with the fractional part (tenths of a second)
+                unsigned long long int extended_timestamp = (unsigned long long int)spotterdata.d.timestamp * 10;
+                //unsigned long long int extended_timestamp = (unsigned long long int)spotterdata.d.timestamp;
+                extended_timestamp += (unsigned long long int)spotterdata.d.timestamp_f;
+                
+                printf("%ld\n", spotterdata.d.Z);
+                // Zero out our message buffer
+                memset(tx_msg, 0, ARRAY_SIZE(tx_msg));
+                //sprintf(tx_msg, "#,%d,%lu,%ld,%ld,%ld\n", spotn, spotterdata.d.timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
+                sprintf(tx_msg, "#,%d,%llu,%ld,%ld,%ld\n", spotn, extended_timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
                 send(clientsock, tx_msg, strlen(tx_msg), 0);
             }
         }

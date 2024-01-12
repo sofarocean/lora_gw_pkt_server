@@ -583,8 +583,8 @@ int main(int argc, char **argv)
             /* writing hex-encoded payload (bundled in 32-bit words) */
             fputs("\"", log_file);
             for (j = 0; j < p->size; ++j) {
-                if ((j > 0) && (j%4 == 0)) fputs("-", log_file);
-                fprintf(log_file, "%02X", p->payload[j]);
+                //if ((j > 0) && (j%4 == 0)) fputs("-", log_file);
+                fprintf(log_file, "%c", p->payload[j]);
             }
 
             /* end of log file line */
