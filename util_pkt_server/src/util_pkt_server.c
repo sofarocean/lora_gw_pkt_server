@@ -530,11 +530,10 @@ int main()
                 //unsigned long long int extended_timestamp = (unsigned long long int)spotterdata.d.timestamp;
                 extended_timestamp += (unsigned long long int)spotterdata.d.timestamp_f;
                 
-                printf("%ld\n", spotterdata.d.Z);
                 // Zero out our message buffer
                 memset(tx_msg, 0, ARRAY_SIZE(tx_msg));
                 //sprintf(tx_msg, "#,%d,%lu,%ld,%ld,%ld\n", spotn, spotterdata.d.timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
-                sprintf(tx_msg, "#,%d,%llu,%ld,%ld,%ld\n", spotn, extended_timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
+                sprintf(tx_msg, "#%d,%llu,%ld,%ld,%ld\n", spotn, extended_timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
                 send(clientsock, tx_msg, strlen(tx_msg), 0);
             }
         }
