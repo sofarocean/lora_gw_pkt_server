@@ -1,0 +1,6 @@
+# Setup instructions
+
+1. Copy rak2245_setup.sh to /usr/bin/
+2. Copy lora_modem.service to /etc/systemd/system/
+3. systemctl enable lora_modem
+4. systemctl start lora_modem
