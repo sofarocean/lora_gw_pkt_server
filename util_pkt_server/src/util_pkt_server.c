@@ -336,12 +336,25 @@ int parse_SX1301_configuration(const char * conf_file) {
 /* -------------------------------------------------------------------------- */
 /* --- MAIN FUNCTION -------------------------------------------------------- */
 
-int main()
+int main(int argc, char *argv[])
 {
     int i; /* loop and temporary variables */
 
+    if (argc == 2) {
+        printf("Using %s as the configuration file.\n", argv[1]);
+    }
+    else if(argc > 2) {
+        printf("Too many arguments passed!\n");
+        exit(1);
+    }
+    else {
+        printf("JSON config file path expected as first and only argument.\n");
+        exit(1);
+    }
+
     /* configuration file related */
-    const char global_conf_fname[] = "global_conf.json"; /* contain global (typ. network-wide) configuration */
+    char *global_conf_fname = argv[1];
+    //const char global_conf_fname[] = "global_conf.json"; /* contain global (typ. network-wide) configuration */
     const char local_conf_fname[] = "local_conf.json"; /* contain node specific configuration, overwrite global parameters for parameters that are defined in both */
 
     /* allocate memory for packet fetching and processing */

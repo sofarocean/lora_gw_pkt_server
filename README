@@ -6,22 +6,22 @@
   - NOTE: You must use the lite version of the OS to avoid latency spikes or other unpredictable behavior.
 
 1. Clone this git repo to the target raspberry pi.
-  - git clone https://github.com/mbella-sofar/lora_gw_pkt_server.git /home/pi/lora_gw_pkt_server
+  - git clone https://github.com/mbella-sofar/lora_gw_pkt_server.git ~/lora_gw_pkt_server
 
 2. Build the util_pkt_server binary
-  - cd /home/pi/lora_gw_pkt_server/util_pkt_server && make
+  - cd ~/lora_gw_pkt_server/util_pkt_server && make
 
 3. Make a directory for all the files needed for the install.
   - sudo mkdir -p /opt/lora_basestation/
 
 4. Copy rak2245_setup.sh to /opt/lora_basestation/
-  - cp /home/pi/lora_gw_pkt_server/rak2245_setup.sh /opt/lora_basestation/
+  - cp ~/lora_gw_pkt_server/rak2245_setup.sh /opt/lora_basestation/
 
 5. Copy the lora packet server binary to /opt/lora_basestation/
-  - cp /home/pi/lora_gw_pkt_server/util_pkt_server/util_pkt_server /opt/lora_basestation/
+  - cp ~/lora_gw_pkt_server/util_pkt_server/util_pkt_server /opt/lora_basestation/
 
 6. Copy rak2245.service to /etc/systemd/system/
-  - cp /home/pi/lora_gw_pkt_server/rak2245.service /etc/systemd/system/
+  - cp ~/lora_gw_pkt_server/rak2245.service /etc/systemd/system/
 
 7. Tell systemd to scan for the newly added service file.
   - sudo systemctl daemon-reload
@@ -37,3 +37,8 @@
   - sudo chown -R root:root /opt/lora_basestation
   - sudo chmod 644 /etc/systemd/system/rak2245.service
   - sudo chown root:root /etc/systemd/system/rak2245.service
+
+
+NOTES
+ - If you modify the rak2245.service file you need to run `sudo systemctl daemon-reload` command afterwards.
+ - 
