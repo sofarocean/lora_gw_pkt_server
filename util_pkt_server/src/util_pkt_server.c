@@ -366,8 +366,9 @@ int main(int argc, char *argv[])
     char tx_msg[100];
     /* Struct to hold data from the spotters */
     union spotterdata_u {
-        uint8_t bytes[17];
+        uint8_t bytes[18];
         struct  {
+            unsigned char type __attribute__((__packed__));
             unsigned long int timestamp __attribute__((__packed__));
             unsigned char timestamp_f __attribute__((__packed__));
             long int X __attribute__((__packed__));
@@ -545,8 +546,12 @@ int main(int argc, char *argv[])
                 
                 // Zero out our message buffer
                 memset(tx_msg, 0, ARRAY_SIZE(tx_msg));
-                //sprintf(tx_msg, "#,%d,%lu,%ld,%ld,%ld\n", spotn, spotterdata.d.timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
-                sprintf(tx_msg, "#%d,%llu,%ld,%ld,%ld\n", spotn, extended_timestamp, spotterdata.d.X, spotterdata.d.Y, spotterdata.d.Z);
+                sprintf(tx_msg, "#%d,%hhu,%llu,%ld,%ld,%ld\n", spotn, \
+                                                          spotterdata.d.type, \
+                                                          extended_timestamp, \
+                                                          spotterdata.d.X, \
+                                                          spotterdata.d.Y, \
+                                                          spotterdata.d.Z);
                 send(clientsock, tx_msg, strlen(tx_msg), 0);
             }
         }

@@ -40,5 +40,5 @@
 
 
 NOTES
- - If you modify the rak2245.service file you need to run `sudo systemctl daemon-reload` command afterwards.
+ - If you modify the rak2245.service file at any point you need to run `sudo systemctl daemon-reload` command afterwards.
  - 
