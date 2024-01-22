@@ -1,10 +1,12 @@
 [Unit]
 Description=Runs the RAK2245 LoRa shield (SX1301) and serves
 After=basic.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 Restart=always
+RestartSec=1s
 ExecStartPre=/opt/lora_basestation/rak2245_setup.sh
 ExecStartPre=/usr/bin/sleep 10
 ExecStart=/opt/lora_basestation/util_pkt_server /opt/lora_basestation/global_conf.json
