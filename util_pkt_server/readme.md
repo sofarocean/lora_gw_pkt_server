@@ -5,17 +5,15 @@
 	(______/|_____)_|_|_| \__)_____)\____)_| |_|
 	  (C)2013 Semtech-Cycleo
 
-LoRa packet logger
+LoRa packet server
 ===================
 
 1. Introduction
 ----------------
 
 This software is used to set up a LoRa concentrator using a JSON configuration
-file and then record all the packets received in a log file, indefinitely, until
-the user stops the application.
-No filtering is done and all packets that are LoRa packets with the correct RF
-parameters (frequency, datarate, bandwidth) should appear in the log.
+file and then filter incoming packets before forwarding them as plain text TCP
+packets on port 2600.
 
 2. Dependencies
 ----------------
@@ -23,9 +21,6 @@ parameters (frequency, datarate, bandwidth) should appear in the log.
 This program uses the Parson library (http://kgabis.github.com/parson/) by
 Krzysztof Gabis for JSON parsing.
 Many thanks to him for that very practical and well written library.
-
-This program is a typical example of LoRa concentrator HAL usage for receiving
-packets.
 
 Only high-level functions are used (the ones contained in loragw_hal) so there
 is no hardware dependencies assuming the HAL is matched with the proper version
