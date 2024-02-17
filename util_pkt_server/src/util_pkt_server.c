@@ -542,6 +542,8 @@ int main(int argc, char *argv[])
                 // Combine the timestamp in seconds with the fractional part (tenths of a second)
                 unsigned long long int extended_timestamp = (unsigned long long int)spotterdata.d.timestamp * 10;
                 //unsigned long long int extended_timestamp = (unsigned long long int)spotterdata.d.timestamp;
+
+                if(spotterdata.d.timestamp_f > 9) spotterdata.d.timestamp_f = 9;
                 extended_timestamp += (unsigned long long int)spotterdata.d.timestamp_f;
                 
                 // Zero out our message buffer
