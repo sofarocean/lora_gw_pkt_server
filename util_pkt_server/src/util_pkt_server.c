@@ -539,15 +539,14 @@ int main(int argc, char *argv[])
                 // Load the received data into a union/struct to parse.
                 memcpy(spotterdata.bytes, p->payload, p->size);
                 
-                // Combine the timestamp in seconds with the fractional part (tenths of a second)
+                // Resulting timestamp will be in tenths of a second since epoch
                 unsigned long long int extended_timestamp = (unsigned long long int)spotterdata.d.timestamp * 10;
-                //unsigned long long int extended_timestamp = (unsigned long long int)spotterdata.d.timestamp;
-
+                // Limit the fractional timestamp part
                 if(spotterdata.d.timestamp_f > 9) spotterdata.d.timestamp_f = 9;
+                // Combine the timestamp in seconds with the fractional part (tenths of a second)
                 extended_timestamp += (unsigned long long int)spotterdata.d.timestamp_f;
                 
-                // Zero out our message buffer
-                memset(tx_msg, 0, ARRAY_SIZE(tx_msg));
+                // Build the ascii string using sprintf to convert and format the variables.
                 sprintf(tx_msg, "#%d,%hhu,%llu,%ld,%ld,%ld\n", spotn, \
                                                           spotterdata.d.type, \
                                                           extended_timestamp, \
