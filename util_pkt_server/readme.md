@@ -11,9 +11,11 @@ LoRa packet server
 1. Introduction
 ----------------
 
-This software is used to set up a LoRa concentrator using a JSON configuration
-file and then filter incoming packets before forwarding them as plain text TCP
-packets on port 2600.
+This program is used to set up a LoRa concentrator based on the settings in
+the provided JSON file. After configuring the concentrator this program polls
+the SX1301 in the concentrator for new packets. As packets are received by the
+concentrator they are read by the program, filtered, decoded, and then
+formatted as ASCII before being sent to an attached network client.
 
 2. Dependencies
 ----------------
@@ -34,6 +36,27 @@ with any later version of the library assuming the API is downward-compatible.
 
 3. Usage
 ---------
+
+This application comes with the files needed to add a systemd service.
+In normal operation this application will be started/stopped/restarted by
+systemd.
+
+During normal operation this application will be started once the RPI boots up.
+If this application crashes systemd will restart it.
+
+To disable this application (stop it from launching at boot):
+sudo systemctl disable rak2245.service
+
+To enable this application (make it launch at boot):
+sudo systemctl enable rak2245.service
+
+To stop the application while it is running:
+sudo systemctl stop rak2245.service
+
+To start the application if it is not running:
+sudo systemctl start rak2245.service
+
+
 
 To stop the application, press Ctrl+C.
 
