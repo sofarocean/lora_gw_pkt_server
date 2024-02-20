@@ -493,7 +493,7 @@ int main(int argc, char *argv[])
                 return EXIT_FAILURE;
             }
         }
-        /* fetch packets */
+        /* Fetch packets from the concentrator */
         nb_pkt = lgw_receive(ARRAY_SIZE(rxpkt), rxpkt);
         if (nb_pkt == LGW_HAL_ERROR) {
             MSG("ERROR: failed packet fetch, exiting\n");
@@ -528,21 +528,26 @@ int main(int argc, char *argv[])
                (p->coderate == CR_LORA_4_5)) {
                 // Packet meets all our criteria. Time to forward it to the network.
                 int spotn = -1;
+
+                // Turn the frequency into the spotter number [0-8]
                 for (unsigned int l=0; l < ARRAY_SIZE(chanlist); l++) {
                     if ((int64_t)chanlist[l] == (int64_t)p->freq_hz) spotn = l;
                 }
+
                 if (spotn == -1) {
                     MSG("INFO: Somehow received packet on unknown frequency (%d Hz)!?\n", p->freq_hz);
                     continue; // Skip the rest of the steps to process this packet.
                 }
                 
-                // Load the received data into a union/struct to parse.
+                // Copy the received data into a union/struct to unpack the values.
                 memcpy(spotterdata.bytes, p->payload, p->size);
                 
                 // Resulting timestamp will be in tenths of a second since epoch
                 unsigned long long int extended_timestamp = (unsigned long long int)spotterdata.d.timestamp * 10;
+                
                 // Limit the fractional timestamp part
                 if(spotterdata.d.timestamp_f > 9) spotterdata.d.timestamp_f = 9;
+                
                 // Combine the timestamp in seconds with the fractional part (tenths of a second)
                 extended_timestamp += (unsigned long long int)spotterdata.d.timestamp_f;
                 
@@ -553,6 +558,7 @@ int main(int argc, char *argv[])
                                                           spotterdata.d.X, \
                                                           spotterdata.d.Y, \
                                                           spotterdata.d.Z);
+                // Send the formatted data out to the client.
                 send(clientsock, tx_msg, strlen(tx_msg), 0);
             }
         }
