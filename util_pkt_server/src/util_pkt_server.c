@@ -7,7 +7,7 @@
   (C)2013 Semtech-Cycleo
 
 Description:
-    Configure LoRa concentrator and record received packets in a log file
+    Configure LoRa concentrator and forward packets to network client
 
 License: Revised BSD License, see LICENSE.TXT file include in the project
 Maintainer: Sylvain Miermont
@@ -59,11 +59,6 @@ static int quit_sig = 0; /* 1 -> application terminates without shutting down th
 /* configuration variables needed by the application  */
 uint64_t lgwm = 0; /* LoRa gateway MAC address */
 char lgwm_str[17];
-
-/* clock and log file management */
-time_t now_time;
-time_t log_start_time;
-char log_file_name[64];
 
 int32_t radio_freqs[2];
 int32_t chan_if_hz[2][4];
