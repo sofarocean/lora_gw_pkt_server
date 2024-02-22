@@ -44,23 +44,23 @@ systemd.
 During normal operation this application will be started once the RPI boots up.
 If this application crashes systemd will restart it.
 
-To disable this application (stop it from launching at boot):
+To disable this application (stop it from launching at boot):\
 `sudo systemctl disable rak2245.service`
 
-To enable this application (make it launch at boot):
+To enable this application (make it launch at boot):\
 `sudo systemctl enable rak2245.service`
 
-To stop the application while it is running:
+To stop the application while it is running:\
 `sudo systemctl stop rak2245.service`
 
-To start the application if it is not running:
+To start the application if it is not running:\
 `sudo systemctl start rak2245.service`
 
 When debugging the application it is easiest to disable the systemd service so
 that you can manually launch the application binary after compiling.
 
 To manually launch the application you need to provide the path to a json 
-configuration file.
+configuration file.\
 `./util_pkt_server /path/to/your/json.file`
 
 To stop the application, press Ctrl+C.
