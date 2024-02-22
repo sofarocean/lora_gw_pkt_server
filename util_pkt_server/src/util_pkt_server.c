@@ -572,7 +572,7 @@ int main(int argc, char *argv[])
         send(clientsock, "DISCONNECT\n", 11, 0);
         
         // Make sure client has time time disconnect 
-        sleep(10);
+        sleep(5);
 
         /* Make sure both sockets are closed */
         printf("Closing client socket\n");
