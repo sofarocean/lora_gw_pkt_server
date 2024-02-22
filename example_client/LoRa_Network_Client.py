@@ -38,6 +38,9 @@ if __name__ == "__main__":
             # If the buffer contains a newline char then split the newest message from the rest.
             if "\n" in buff:
                 pkt,sep,buff = buff.partition("\n")
+                if pkt == "DISCONNECT":
+                    skt.close()
+                    sys.exit()
                 print(pkt)
             else:
                 # Go to the start of the loop ASAP if we haven't received a full packet yet.

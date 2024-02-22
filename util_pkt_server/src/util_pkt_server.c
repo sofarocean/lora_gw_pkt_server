@@ -87,7 +87,7 @@ int cmpfunc (const void * a, const void * b) {
 
 static void sig_handler(int sigio) {
     if (sigio == SIGQUIT) {
-        quit_sig = 1;;
+        quit_sig = 1;
     } else if ((sigio == SIGINT) || (sigio == SIGTERM)) {
         exit_sig = 1;
     }
@@ -568,8 +568,17 @@ int main(int argc, char *argv[])
             MSG("WARNING: failed to stop concentrator successfully\n");
         }
 
-        /* Make sure the socket is closed */
-        close(clientsock); // This is probably the wrong way to do this!!!
+        // Send string to tell client to disconnect
+        send(clientsock, "DISCONNECT\n", 11, 0);
+        
+        // Make sure client has time time disconnect 
+        sleep(10);
+
+        /* Make sure both sockets are closed */
+        printf("Closing client socket\n");
+        close(clientsock);
+        printf("Closing server socket\n");
+        close(serversock);
     }
 
     MSG("INFO: Exiting packet server program\n");
