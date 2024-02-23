@@ -511,6 +511,8 @@ int main(int argc, char *argv[])
             MSG("INFO: Client disconnected.\n");
             // The client disconnected!
             close(clientsock); // Don't forget to close the socket when the remote end disconnects!
+            connected = 0;
+            continue;
         }
 
         /* process packets */
