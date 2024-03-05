@@ -5,34 +5,39 @@
     - NOTE: You must use the 32 bit version of the OS!
     - NOTE: You must use the lite version of the OS to avoid latency spikes or other unpredictable behavior.
 
-1. Clone this git repo to the target raspberry pi.
+1. Enable SPI on the Raspberry Pi using the `sudo raspi-config` command.
+   - Select "Interface Options" from the main raspi-config menu.
+   - Select "SPI" from the sub menu.
+   - Respond "Yes" to the prompt. 
+
+2. Clone this git repo to the target raspberry pi.
     - `git clone https://github.com/mbella-sofar/lora_gw_pkt_server.git ~/lora_gw_pkt_server`
 
-2. Build the util_pkt_server binary
+3. Build the util_pkt_server binary
     - `cd ~/lora_gw_pkt_server/util_pkt_server && make`
 
-3. Make a directory for all the files needed for the install.
+4. Make a directory for all the files needed for the install.
     - `sudo mkdir -p /opt/lora_basestation/`
 
-4. Copy rak2245_setup.sh to /opt/lora_basestation/
+5. Copy rak2245_setup.sh to /opt/lora_basestation/
     - `cp ~/lora_gw_pkt_server/rak2245_setup.sh /opt/lora_basestation/`
 
-5. Copy the lora packet server binary to /opt/lora_basestation/
+6. Copy the lora packet server binary to /opt/lora_basestation/
     - `cp ~/lora_gw_pkt_server/util_pkt_server/util_pkt_server /opt/lora_basestation/`
 
-6. Copy rak2245.service to /etc/systemd/system/
+7. Copy rak2245.service to /etc/systemd/system/
     - `cp ~/lora_gw_pkt_server/rak2245.service /etc/systemd/system/`
 
-7. Tell systemd to scan for the newly added service file.
+8. Tell systemd to scan for the newly added service file.
     - `sudo systemctl daemon-reload`
 
-7. Enable the service so it starts on boot fron now on.
+9. Enable the service so it starts on boot fron now on.
     - `sudo systemctl enable rak2245`
 
-8. Start the service now so we can see things working without needing a restart.
+10. Start the service now so we can see things working without needing a restart.
     - `sudo systemctl start rak2245`
 
-9. Make sure permissions are set correctly for all files
+11. Make sure permissions are set correctly for all files
     - `sudo chmod -R 755 /opt/lora_basestation`
     - `sudo chown -R root:root /opt/lora_basestation`
     - `sudo chmod 644 /etc/systemd/system/rak2245.service`
