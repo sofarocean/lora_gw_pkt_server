@@ -9,7 +9,7 @@ For more information on how to connect to the LoRa packet server once it is runn
 # Setup Instructions
 
 0. Set the raspberry pi up with a plain install of "Raspberry Pi OS Lite 32-bit"
-    - Follow instructions from raspberrypi.com to complete the OS install.
+    - Follow instructions from [raspberrypi.com](https://www.raspberrypi.com/) to install the OS.
     - NOTE: You must use the 32 bit version of the OS!
     - NOTE: You must use the lite version of the OS to avoid latency spikes or other unpredictable behavior.
 
