@@ -16,18 +16,18 @@
             "rssi_offset": -166.0,
             "enable": true,
             "type": "SX1257",
-            "freq": 915700000,
+            "freq": 915300000,
             "tx_enable": false
         },
         "chan_multiSF_0": {
             "enable": true,
             "radio": 0,
-            "if": -500000
+            "if": -300000
         },
         "chan_multiSF_1": {
             "enable": true,
             "radio": 0,
-            "if": -300000
+            "if": -100000
         },
         "chan_multiSF_2": {
             "enable": true,
@@ -37,12 +37,12 @@
         "chan_multiSF_3": {
             "enable": true,
             "radio": 0,
-            "if": 500000
+            "if": 300000
         },
         "chan_multiSF_4": {
             "enable": true,
             "radio": 1,
-            "if": -500000
+            "if": -300000
         },
         "chan_multiSF_5": {
             "enable": true,
@@ -52,12 +52,12 @@
         "chan_multiSF_6": {
             "enable": true,
             "radio": 1,
-            "if": 300000
+            "if": 100000
         },
         "chan_multiSF_7": {
             "enable": true,
             "radio": 1,
-            "if": 500000
+            "if": 300000
         },
         "chan_Lora_std": {
             "enable": true,
