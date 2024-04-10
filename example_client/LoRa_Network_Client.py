@@ -41,7 +41,7 @@ if __name__ == "__main__":
                 if pkt == "DISCONNECT":
                     skt.close()
                     sys.exit()
-                print(pkt)
+                print(pkt, flush=True)
             else:
                 # Go to the start of the loop ASAP if we haven't received a full packet yet.
                 continue
