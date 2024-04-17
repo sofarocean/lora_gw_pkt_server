@@ -33,10 +33,10 @@ For more information on how to connect to the LoRa packet server once it is runn
     - `sudo cp ~/lora_gw_pkt_server/rak2245_setup.sh /opt/lora_basestation/`
 
 6. Copy the lora packet server binary to /opt/lora_basestation/
-    - `cp ~/lora_gw_pkt_server/util_pkt_server/util_pkt_server /opt/lora_basestation/`
+    - `sudo cp ~/lora_gw_pkt_server/util_pkt_server/util_pkt_server /opt/lora_basestation/`
 
 7. Copy rak2245.service to /etc/systemd/system/
-    - `cp ~/lora_gw_pkt_server/rak2245.service /etc/systemd/system/`
+    - `sudo cp ~/lora_gw_pkt_server/rak2245.service /etc/systemd/system/`
 
 8. Make sure permissions are set correctly for all files
     - `sudo chmod -R 755 /opt/lora_basestation`
