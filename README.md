@@ -18,7 +18,8 @@ For more information on how to connect to the LoRa packet server once it is runn
    - Select "SPI" from the sub menu.
    - Respond "Yes" to the prompt. 
 
-2. Clone this git repo to the target raspberry pi.
+2. Install git and clone this git repo to the target raspberry pi.
+    - `sudo apt install git`
     - `git clone https://github.com/mbella-sofar/lora_gw_pkt_server.git ~/lora_gw_pkt_server`
 
 3. Build the util_pkt_server binary
