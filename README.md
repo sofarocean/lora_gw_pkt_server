@@ -30,7 +30,7 @@ For more information on how to connect to the LoRa packet server once it is runn
     - `sudo mkdir -p /opt/lora_basestation/`
 
 5. Copy rak2245_setup.sh to /opt/lora_basestation/
-    - `cp ~/lora_gw_pkt_server/rak2245_setup.sh /opt/lora_basestation/`
+    - `sudo cp ~/lora_gw_pkt_server/rak2245_setup.sh /opt/lora_basestation/`
 
 6. Copy the lora packet server binary to /opt/lora_basestation/
     - `cp ~/lora_gw_pkt_server/util_pkt_server/util_pkt_server /opt/lora_basestation/`
