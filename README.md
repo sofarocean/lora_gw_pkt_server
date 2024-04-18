@@ -31,6 +31,7 @@ For more information on how to connect to the LoRa packet server once it is runn
 
 5. Copy rak2245_setup.sh to /opt/lora_basestation/
     - `sudo cp ~/lora_gw_pkt_server/rak2245_setup.sh /opt/lora_basestation/`
+    - NOTE: If you are installing this on a newer RPI os then you will need to use rak2245_setup2.sh instead!
 
 6. Copy the lora packet server binary to /opt/lora_basestation/
     - `sudo cp ~/lora_gw_pkt_server/util_pkt_server/util_pkt_server /opt/lora_basestation/`
