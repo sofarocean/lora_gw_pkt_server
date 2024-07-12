@@ -361,7 +361,7 @@ int main(int argc, char *argv[])
     char tx_msg[100];
     /* Struct to hold data from the spotters */
     union spotterdata_u {
-        uint8_t bytes[18];
+        uint8_t bytes[55];
         struct  {
             unsigned char type __attribute__((__packed__));
             unsigned long int timestamp __attribute__((__packed__));
@@ -369,6 +369,10 @@ int main(int argc, char *argv[])
             long int X __attribute__((__packed__));
             long int Y __attribute__((__packed__));
             long int Z __attribute__((__packed__));
+            char LATD __attribute__((__packed__));
+            long int LATM __attribute__((__packed__));
+            int LOND __attribute__((__packed__));
+            long int LONM __attribute__((__packed__));
         } d;
     } spotterdata;
 
@@ -548,13 +552,19 @@ int main(int argc, char *argv[])
                 // Combine the timestamp in seconds with the fractional part (tenths of a second)
                 extended_timestamp += (unsigned long long int)spotterdata.d.timestamp_f;
                 
+		// Convert deg & min back to decimal degrees before sending
+		float latitude = spotterdata.d.LATD + (spotterdata.d.LATM / 6000000.0);
+		float longitude = spotterdata.d.LOND + (spotterdata.d.LONM / 6000000.0);
+
                 // Build the ascii string using sprintf to convert and format the variables.
-                sprintf(tx_msg, "#%d,%hhu,%llu,%ld,%ld,%ld\n", spotn, \
+                sprintf(tx_msg, "#%d,%hhu,%llu,%ld,%ld,%ld,%.9f,%.9f\n", spotn, \
                                                           spotterdata.d.type, \
                                                           extended_timestamp, \
                                                           spotterdata.d.X, \
                                                           spotterdata.d.Y, \
-                                                          spotterdata.d.Z);
+                                                          spotterdata.d.Z, \
+                                                          latitude, \
+							  longitude);
                 // Send the formatted data out to the client.
                 send(clientsock, tx_msg, strlen(tx_msg), 0);
             }
